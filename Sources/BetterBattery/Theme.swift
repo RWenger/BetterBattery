@@ -18,9 +18,10 @@ enum PowerAccent {
     static let blueText = adaptive(light: (0.039, 0.373, 0.761), dark: blue)      // #0A5FC2
     static let orangeText = adaptive(light: (0.604, 0.306, 0.031), dark: orange)  // #9A4E08
     static let redText = adaptive(light: (0.729, 0.110, 0.071), dark: red)        // #BA1C12
-    /// Neutral chip text (the Settings header): dark gray rather than pure
-    /// black, so it reads as clickable without outweighing the colored chips.
-    static let neutralText = adaptive(light: (0.314, 0.314, 0.333), dark: Color(white: 0.84))  // #505055
+    /// Neutral chip text (the Settings header): in light mode a dark gray, so
+    /// it reads as clickable rather than disabled without outweighing the
+    /// colored chips. Dark mode keeps the original `.gray`.
+    static let neutralText = adaptive(light: (0.314, 0.314, 0.333), dark: .gray)  // #505055
 
     private static func adaptive(light: (Double, Double, Double), dark: Color) -> Color {
         let darkNS = NSColor(dark)
