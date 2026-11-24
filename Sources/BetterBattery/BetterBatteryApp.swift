@@ -18,6 +18,7 @@ struct BetterBatteryApp: App {
 
 enum DefaultsKey {
     static let menuBarDisplayMode = "menuBarDisplayMode"
+    static let menuBarIconStyle = "menuBarIconStyle"
     static let warnThreshold = "warnThreshold"
     static let criticalThreshold = "criticalThreshold"
     static let lowBatteryGlow = "lowBatteryGlow"

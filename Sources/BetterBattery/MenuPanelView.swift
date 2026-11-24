@@ -54,6 +54,7 @@ struct MenuPanelView: View {
     @ObservedObject var monitor: PowerMonitor
     @ObservedObject private var updater = UpdateChecker.shared
     @AppStorage(DefaultsKey.menuBarDisplayMode) private var displayModeRaw = MenuBarDisplayMode.percent.rawValue
+    @AppStorage(DefaultsKey.menuBarIconStyle) private var iconStyleRaw = MenuBarIconStyle.classic.rawValue
     @AppStorage(DefaultsKey.warnThreshold) private var warnThreshold = 20
     @AppStorage(DefaultsKey.criticalThreshold) private var criticalThreshold = 10
     @AppStorage(DefaultsKey.lowBatteryGlow) private var lowBatteryGlow = true
@@ -126,6 +127,19 @@ struct MenuPanelView: View {
                         Picker("Battery icon shows", selection: $displayModeRaw) {
                             ForEach(MenuBarDisplayMode.allCases) { mode in
                                 Text(mode.label).tag(mode.rawValue)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Icon style")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Picker("Icon style", selection: $iconStyleRaw) {
+                            ForEach(MenuBarIconStyle.allCases) { style in
+                                Text(style.label).tag(style.rawValue)
                             }
                         }
                         .pickerStyle(.segmented)

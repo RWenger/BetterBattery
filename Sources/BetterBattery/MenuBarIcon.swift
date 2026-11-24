@@ -19,6 +19,23 @@ enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum MenuBarIconStyle: String, CaseIterable, Identifiable {
+    /// The original filled capsule with the reading punched out.
+    case classic
+    /// Closer to the system battery: solid white outline and fill, faint
+    /// white empty track, reading and bolt cut out as transparent holes.
+    case outline
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .classic: return "Classic"
+        case .outline: return "Outline"
+        }
+    }
+}
+
 /// Flat, modern battery glyph modeled on the iOS status bar battery:
 /// translucent capsule track, solid fill sized to the charge level, and the
 /// reading (percent / time / watts) punched out of the shape as a cutout.
@@ -30,6 +47,7 @@ enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
 struct BatteryGlyph: View {
     let snapshot: BatterySnapshot
     let mode: MenuBarDisplayMode
+    var style: MenuBarIconStyle = .classic
     let darkMenuBar: Bool
     let warn: Int
     let critical: Int
@@ -42,6 +60,15 @@ struct BatteryGlyph: View {
     private var baseColor: Color { darkMenuBar ? .white : .black }
 
     var body: some View {
+        switch style {
+        case .classic: classicBody
+        case .outline: outlineBody
+        }
+    }
+
+    // MARK: - Classic
+
+    private var classicBody: some View {
         HStack(spacing: 1.5) {
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -68,19 +95,80 @@ struct BatteryGlyph: View {
         .padding(.horizontal, 1)
     }
 
+    // MARK: - Outline
+
+    private let outlineWidth: CGFloat = 28
+    private let outlineHeight: CGFloat = 12.5
+    private let outlineInset: CGFloat = 2
+    private var outlineInnerWidth: CGFloat { outlineWidth - outlineInset * 2 }
+    private var outlineInnerHeight: CGFloat { outlineHeight - outlineInset * 2 }
+
+    private var outlineFillWidth: CGFloat {
+        guard snapshot.state != .noBattery else { return 0 }
+        let fraction = max(0, min(1, Double(snapshot.percent) / 100))
+        return max(2, outlineInnerWidth * CGFloat(fraction))
+    }
+
+    /// White like the system battery; orange/red only past the low-battery
+    /// thresholds.
+    private var outlineFillColor: Color {
+        if snapshot.state == .discharging {
+            if snapshot.percent <= critical { return PowerAccent.red }
+            if snapshot.percent <= warn { return PowerAccent.orange }
+        }
+        return .white
+    }
+
+    private var outlineBody: some View {
+        HStack(spacing: 1) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                    .strokeBorder(Color.white, lineWidth: 1)
+
+                ZStack(alignment: .leading) {
+                    // Faint track so the cut-out reading stays legible past
+                    // the fill (a fully transparent track would swallow it).
+                    Rectangle()
+                        .fill(Color.white.opacity(0.35))
+                    Rectangle()
+                        .fill(outlineFillColor)
+                        .frame(width: outlineFillWidth)
+                    readoutContent(boltSize: 6.5, textSize: 8.5, weight: .semibold, design: .default)
+                        .frame(width: outlineInnerWidth, height: outlineInnerHeight)
+                        .blendMode(.destinationOut)
+                }
+                .compositingGroup()
+                .frame(width: outlineInnerWidth, height: outlineInnerHeight)
+                .clipShape(RoundedRectangle(cornerRadius: 1.5, style: .continuous))
+            }
+            .frame(width: outlineWidth, height: outlineHeight)
+
+            // the nub
+            RoundedRectangle(cornerRadius: 0.75, style: .continuous)
+                .fill(Color.white)
+                .frame(width: 1.5, height: 4)
+        }
+        .padding(.vertical, 1)
+        .padding(.horizontal, 1)
+    }
+
     // MARK: - Pieces
 
-    @ViewBuilder
     private var readoutOverlay: some View {
+        readoutContent(boltSize: 7, textSize: 9.5, weight: .bold, design: .rounded)
+    }
+
+    @ViewBuilder
+    private func readoutContent(boltSize: CGFloat, textSize: CGFloat, weight: Font.Weight, design: Font.Design) -> some View {
         if snapshot.state != .noBattery {
-            HStack(spacing: 1) {
+            HStack(spacing: style == .outline ? 0.5 : 1) {
                 if snapshot.state == .charging && mode != .watts {
                     Image(systemName: "bolt.fill")
-                        .font(.system(size: 7, weight: .bold))
+                        .font(.system(size: boltSize, weight: .bold))
                 }
                 if let readout {
                     Text(readout)
-                        .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                        .font(.system(size: textSize, weight: weight, design: design))
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
@@ -139,13 +227,14 @@ struct BatteryGlyph: View {
     /// Everything that affects the rendered pixels, cheap to compare —
     /// MenuBarLabel uses this to skip re-rendering identical frames.
     var cacheKey: String {
-        "\(mode.rawValue)|\(readout ?? "")|\(snapshot.percent)|\(String(describing: snapshot.state))|\(darkMenuBar)|\(warn)|\(critical)"
+        "\(style.rawValue)|\(mode.rawValue)|\(readout ?? "")|\(snapshot.percent)|\(String(describing: snapshot.state))|\(darkMenuBar)|\(warn)|\(critical)"
     }
 }
 
 struct MenuBarLabel: View {
     @ObservedObject var monitor: PowerMonitor
     @AppStorage(DefaultsKey.menuBarDisplayMode) private var displayModeRaw = MenuBarDisplayMode.percent.rawValue
+    @AppStorage(DefaultsKey.menuBarIconStyle) private var iconStyleRaw = MenuBarIconStyle.classic.rawValue
     @AppStorage(DefaultsKey.warnThreshold) private var warnThreshold = 20
     @AppStorage(DefaultsKey.criticalThreshold) private var criticalThreshold = 10
     @Environment(\.colorScheme) private var colorScheme
@@ -154,6 +243,7 @@ struct MenuBarLabel: View {
         let glyph = BatteryGlyph(
             snapshot: monitor.snapshot,
             mode: MenuBarDisplayMode(rawValue: displayModeRaw) ?? .percent,
+            style: MenuBarIconStyle(rawValue: iconStyleRaw) ?? .classic,
             darkMenuBar: colorScheme == .dark,
             warn: warnThreshold,
             critical: criticalThreshold
